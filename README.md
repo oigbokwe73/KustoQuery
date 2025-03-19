@@ -1,5 +1,24 @@
 # KustoQuery
 
+
+You can use the following Kusto query to analyze read latency metrics (ReadLatencyMs) from **InsightMetrics**:
+
+```kql
+InsightsMetrics
+| where Name == "ReadLatencyMs"
+| project TimeGenerated, Computer, Disk = Tags["Disk"], ReadLatencyMs = Val
+| summarize AvgReadLatencyMs = avg(ReadLatencyMs) by Computer, Disk, bin(TimeGenerated, 1h)
+| order by TimeGenerated desc
+```
+
+### Key Points:
+- **Name == "ReadLatencyMs"**: Filters the data to show only the read latency metric.
+- **project**: Selects specific columns for clarity (time, computer name, disk, and the read latency value).
+- **summarize**: Aggregates the average read latency by computer, disk, and hourly intervals.
+- **order by TimeGenerated desc**: Sorts the results to display the latest metrics first.
+
+You can adjust the time bin (for example, `bin(TimeGenerated, 30m)` for 30-minute intervals) or filter further by specific computers or disks to narrow down your analysis.
+
 If you’re looking to query **CPU utilization** using the `UtilizationPercentage` metric in **InsightsMetrics**, you can use the following KQL query:
 
 ```kql
