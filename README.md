@@ -1,4 +1,32 @@
 # KustoQuery
+
+If you’re looking to query **CPU utilization** using the `UtilizationPercentage` metric in **InsightsMetrics**, you can use the following KQL query:
+
+```kql
+InsightsMetrics
+| where Name == "UtilizationPercentage"
+| summarize AvgCpuUtilization = avg(Val) by Computer, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc
+```
+
+### Explanation:
+- **InsightsMetrics**: The table containing performance metrics.
+- **Name == "UtilizationPercentage"**: Filters for the CPU utilization percentage metric.
+- **summarize AvgCpuUtilization**: Calculates the average CPU utilization for each computer over 5-minute intervals.
+- **bin(TimeGenerated, 5m)**: Groups results into 5-minute time blocks.
+- **order by TimeGenerated desc**: Sorts the results so the most recent data is displayed first.
+
+#### Additional Filters:
+- To focus on a specific computer:  
+  ```kql
+  | where Computer == "<Your_Computer_Name>"
+  ```
+- To find times when CPU utilization was above a certain threshold (e.g., 80%):  
+  ```kql
+  | where Val > 80
+  ```
+
+Let me know if you need further assistance!
 If you have a known maximum memory capacity (for example, 32 GB) and want to see how the current memory usage compares to that limit, you can structure your Kusto query as follows:
 
 ```kql
