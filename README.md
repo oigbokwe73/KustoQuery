@@ -1,6 +1,40 @@
 # KustoQuery
 
 
+To analyze status codes from Azure Gateway logs and categorize them into a simple “Green/Yellow/Red” status indicator based on whether the status code is above 399, you can use the following Kusto query:
+
+```kql
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS" and ResponseStatus_d != ""
+| extend StatusCategory = case(
+    ResponseStatus_d <= 399, "Green",
+    ResponseStatus_d > 399 and ResponseStatus_d <= 499, "Yellow",
+    ResponseStatus_d >= 500, "Red",
+    "Unknown"
+)
+| summarize Count = count() by StatusCategory
+| order by StatusCategory
+```
+
+### Explanation:
+1. **Filtering Logs:**  
+   - The query filters `AzureDiagnostics` logs specific to Application Gateways (`ResourceType == "APPLICATIONGATEWAYS"`) and ensures the `ResponseStatus_d` field is not null or empty.
+   
+2. **Categorizing Status Codes:**  
+   - `case()` assigns a category based on the numeric range of `ResponseStatus_d`:
+     - `Green`: Status codes 399 or below (successful or informational responses).
+     - `Yellow`: Status codes between 400 and 499 (client errors).
+     - `Red`: Status codes 500 and above (server errors).
+   
+3. **Summarizing Results:**  
+   - `summarize` counts how many responses fall into each category.
+   
+4. **Ordering:**  
+   - The results are sorted by category name for a clear presentation.
+
+This query gives you a concise view of how often your Azure Gateway logs show errors and allows you to quickly assess system health with color-coded status categories.
+
+
 You can use the following Kusto query to analyze read latency metrics (ReadLatencyMs) from **InsightMetrics**:
 
 ```kql
