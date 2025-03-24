@@ -1,5 +1,31 @@
 # KustoQuery
 
+To visualize the indicators (green, yellow, red) in Azure Monitor’s Log Analytics, you can use the built-in charting capabilities. You don’t need to modify the KQL query structure significantly; instead, you just apply a rendering directive after your main query. For example:
+
+```kql
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS" and ResponseStatus_d != ""
+| extend StatusCategory = case(
+    ResponseStatus_d <= 399, "Green",
+    ResponseStatus_d > 399 and ResponseStatus_d <= 499, "Yellow",
+    ResponseStatus_d >= 500, "Red",
+    "Unknown"
+)
+| summarize Count = count() by bin(TimeGenerated, 1h), StatusCategory
+| render columnchart with (title="Gateway Status Indicators", ytitle="Count", series=StatusCategory, kind=stacked)
+```
+
+### Key Additions:
+- **`| render columnchart`**: Tells Log Analytics to create a column chart.  
+- **`with (...)`**: Sets properties like the chart title, Y-axis title, and the grouping series (`StatusCategory`).  
+- **`kind=stacked`**: Displays a stacked column chart so you can easily see the proportion of each status category at each time interval.
+
+### Expected Output:
+- **X-Axis:** Time intervals (hourly bins).
+- **Y-Axis:** The count of each status category (Green, Yellow, Red).
+- **Visualization:** A stacked column chart showing the distribution of status codes over time, with distinct colors (green, yellow, red) for each category.
+
+This approach directly integrates a visual representation into your Log Analytics results, making it easier to track trends and identify periods of higher error rates.
 
 To analyze status codes from Azure Gateway logs and categorize them into a simple “Green/Yellow/Red” status indicator based on whether the status code is above 399, you can use the following Kusto query:
 
