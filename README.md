@@ -1,5 +1,34 @@
 # KustoQuery
 
+You can incorporate an average percentage calculation by dividing the count of each status category by the total count for that hour and multiplying by 100. For example:
+
+```kql
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS" and ResponseStatus_d != ""
+| extend StatusCategory = case(
+    ResponseStatus_d <= 399, "Green",
+    ResponseStatus_d > 399 and ResponseStatus_d <= 499, "Yellow",
+    ResponseStatus_d >= 500, "Red",
+    "Unknown"
+)
+| summarize 
+    Count = count(), 
+    GreenCount = countif(StatusCategory == "Green"),
+    YellowCount = countif(StatusCategory == "Yellow"),
+    RedCount = countif(StatusCategory == "Red"),
+    GreenPercentage = 100 * countif(StatusCategory == "Green") / count(),
+    YellowPercentage = 100 * countif(StatusCategory == "Yellow") / count(),
+    RedPercentage = 100 * countif(StatusCategory == "Red") / count()
+    by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+### Explanation:
+- **`countif()`**: Counts only the rows matching the condition for each category.
+- **`GreenPercentage`, `YellowPercentage`, `RedPercentage`**: These fields represent the percentage of each category out of the total count for each hour.
+
+This query provides both the raw counts and the relative percentages for each status category, allowing you to monitor not just the total occurrences but also the proportion of each type of status over time.
+
 To visualize the indicators (green, yellow, red) in Azure Monitor’s Log Analytics, you can use the built-in charting capabilities. You don’t need to modify the KQL query structure significantly; instead, you just apply a rendering directive after your main query. For example:
 
 ```kql
