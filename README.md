@@ -1,5 +1,36 @@
 # KustoQuery
 
+Here’s a **Kusto Query** (KQL) that summarizes `SignInLogs` by **hour**, **day**, and **month**, showing the count of sign-ins:
+
+```kusto
+SignInLogs
+| extend Hour = format_datetime(TimeGenerated, 'yyyy-MM-dd HH:00')
+| extend Day = format_datetime(TimeGenerated, 'yyyy-MM-dd')
+| extend Month = format_datetime(TimeGenerated, 'yyyy-MM')
+| summarize CountPerHour = count() by Hour
+| join kind=inner (
+    SignInLogs
+    | extend Day = format_datetime(TimeGenerated, 'yyyy-MM-dd')
+    | summarize CountPerDay = count() by Day
+) on Day
+| join kind=inner (
+    SignInLogs
+    | extend Month = format_datetime(TimeGenerated, 'yyyy-MM')
+    | summarize CountPerMonth = count() by Month
+) on $left.Month == $right.Month
+| project Hour, CountPerHour, Day, CountPerDay, Month, CountPerMonth
+```
+
+### Explanation:
+- `format_datetime(...)`: Formats `TimeGenerated` into specific units.
+- `summarize ... by`: Aggregates the count by each time bucket.
+- `join`: Combines all the summaries on common time columns.
+
+Let me know if you'd like:
+- Filters (like `ResultType`, `UserPrincipalName`, or `Location`),
+- A visual-ready format (like for Power BI),
+- Or an hourly trend chart over a selected time frame.
+
 You can incorporate an average percentage calculation by dividing the count of each status category by the total count for that hour and multiplying by 100. For example:
 
 ```kql
