@@ -1,5 +1,115 @@
 # KustoQuery
 
+Great question! If you're in a constrained environment like **Microsoft Sentinel Workbook queries**, **Log Analytics alerts**, or **Power BI DirectQuery mode**, you might **not be allowed to use `let` statements**. In those cases, you can still achieve the same logic using **nested subqueries**, **common table expressions**, or just **inlined logic**.
+
+Here are a few **workarounds** to replace `let`:
+
+---
+
+### ✅ 1. **Inline Filters and Expressions**
+Instead of:
+```kusto
+let startTime = ago(30d);
+SignInLogs
+| where TimeGenerated > startTime
+```
+
+Use:
+```kusto
+SignInLogs
+| where TimeGenerated > ago(30d)
+```
+
+---
+
+### ✅ 2. **Use Subqueries Instead of `let` Blocks**
+Instead of:
+```kusto
+let logs = SignInLogs | where TimeGenerated > ago(30d);
+logs | summarize count()
+```
+
+Use:
+```kusto
+(
+    SignInLogs
+    | where TimeGenerated > ago(30d)
+)
+| summarize count()
+```
+
+---
+
+### ✅ 3. **Rewrite `let` Chains as `union` of Subqueries**
+
+Here’s a version of your query **without any `let`**:
+
+```kusto
+// Hourly Summary
+(
+    SignInLogs
+    | where TimeGenerated > ago(30d)
+    | extend Hour = format_datetime(TimeGenerated, 'yyyy-MM-dd HH:00')
+    | extend Result = iff(ResultType == 0, "Success", "Failure")
+    | summarize TotalSignIns = count(),
+                SuccessCount = countif(Result == "Success"),
+                FailureCount = countif(Result == "Failure"),
+                DistinctUsers = dcount(UserPrincipalName)
+      by Hour
+    | project TimePeriod = Hour, Level = "Hourly", TotalSignIns, SuccessCount, FailureCount, DistinctUsers
+)
+| union (
+    // Daily Summary
+    SignInLogs
+    | where TimeGenerated > ago(30d)
+    | extend Day = format_datetime(TimeGenerated, 'yyyy-MM-dd')
+    | extend Result = iff(ResultType == 0, "Success", "Failure")
+    | summarize TotalSignIns = count(),
+                SuccessCount = countif(Result == "Success"),
+                FailureCount = countif(Result == "Failure"),
+                DistinctUsers = dcount(UserPrincipalName)
+      by Day
+    | project TimePeriod = Day, Level = "Daily", TotalSignIns, SuccessCount, FailureCount, DistinctUsers
+)
+| union (
+    // Monthly Summary
+    SignInLogs
+    | where TimeGenerated > ago(30d)
+    | extend Month = format_datetime(TimeGenerated, 'yyyy-MM')
+    | extend Result = iff(ResultType == 0, "Success", "Failure")
+    | summarize TotalSignIns = count(),
+                SuccessCount = countif(Result == "Success"),
+                FailureCount = countif(Result == "Failure"),
+                DistinctUsers = dcount(UserPrincipalName)
+      by Month
+    | project TimePeriod = Month, Level = "Monthly", TotalSignIns, SuccessCount, FailureCount, DistinctUsers
+)
+| union (
+    // Today's Summary
+    SignInLogs
+    | where TimeGenerated >= startofday(now())
+    | summarize TotalSignIns = count(),
+                SuccessCount = countif(ResultType == 0),
+                FailureCount = countif(ResultType != 0),
+                DistinctUsers = dcount(UserPrincipalName)
+    | extend TimePeriod = format_datetime(startofday(now()), 'yyyy-MM-dd'), Level = "Today"
+    | project TimePeriod, Level, TotalSignIns, SuccessCount, FailureCount, DistinctUsers
+)
+| order by TimePeriod desc
+```
+
+---
+
+### 🛠 When to Use These Alternatives
+
+- 🔄 **Power BI / Dashboards**: Use subqueries when `let` is blocked.
+- 📉 **Workbooks / Sentinel Analytics Rules**: Subqueries are more compatible.
+- 🧪 **Testing**: For environments where `let` syntax leads to failure.
+
+---
+
+Let me know your specific platform (Sentinel, Power BI, Workbook, etc.), and I can tailor this even further to ensure it works 100%.
+
 Absolutely! Let's expand the Kusto query to give you more control and insight, breaking it down into **separate time-based summaries** for **hourly**, **daily**, and **monthly**, including details like **successful vs failed sign-ins**, **location**, and **app used**.
 
 ---
