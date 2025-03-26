@@ -1,5 +1,77 @@
 # KustoQuery
 
+Absolutely! Let's expand the Kusto query to give you more control and insight, breaking it down into **separate time-based summaries** for **hourly**, **daily**, and **monthly**, including details like **successful vs failed sign-ins**, **location**, and **app used**.
+
+---
+
+### 🔍 Expanded Kusto Query for `SignInLogs` with Hourly, Daily, and Monthly Summary
+
+```kusto
+// Define the time range
+let startTime = ago(30d);
+let endTime = now();
+
+// Filter SignInLogs and calculate Hour, Day, Month
+let logs = SignInLogs
+| where TimeGenerated between (startTime .. endTime)
+| extend
+    Hour = format_datetime(TimeGenerated, 'yyyy-MM-dd HH:00'),
+    Day = format_datetime(TimeGenerated, 'yyyy-MM-dd'),
+    Month = format_datetime(TimeGenerated, 'yyyy-MM'),
+    Result = iff(ResultType == 0, "Success", "Failure");
+
+// Hourly Summary
+let hourlySummary = logs
+| summarize TotalSignIns = count(),
+            SuccessCount = countif(Result == "Success"),
+            FailureCount = countif(Result == "Failure"),
+            DistinctUsers = dcount(UserPrincipalName)
+  by Hour;
+
+// Daily Summary
+let dailySummary = logs
+| summarize TotalSignIns = count(),
+            SuccessCount = countif(Result == "Success"),
+            FailureCount = countif(Result == "Failure"),
+            DistinctUsers = dcount(UserPrincipalName)
+  by Day;
+
+// Monthly Summary
+let monthlySummary = logs
+| summarize TotalSignIns = count(),
+            SuccessCount = countif(Result == "Success"),
+            FailureCount = countif(Result == "Failure"),
+            DistinctUsers = dcount(UserPrincipalName)
+  by Month;
+
+// Output each section separately
+union 
+  hourlySummary | project TimePeriod = Hour, Level = "Hourly", TotalSignIns, SuccessCount, FailureCount, DistinctUsers,
+  dailySummary | project TimePeriod = Day, Level = "Daily", TotalSignIns, SuccessCount, FailureCount, DistinctUsers,
+  monthlySummary | project TimePeriod = Month, Level = "Monthly", TotalSignIns, SuccessCount, FailureCount, DistinctUsers
+| order by TimePeriod desc
+```
+
+---
+
+### 📊 Output Columns Explained:
+- `TimePeriod`: Time bucket (hour, day, or month).
+- `Level`: Indicates whether it's an hourly, daily, or monthly summary.
+- `TotalSignIns`: Total number of sign-in attempts.
+- `SuccessCount`: Number of successful logins.
+- `FailureCount`: Number of failed logins.
+- `DistinctUsers`: Number of unique users.
+
+---
+
+### ✅ Optional Add-ons
+You can enhance this query by grouping on additional dimensions:
+- Group by `Location` to analyze geographic trends.
+- Group by `AppDisplayName` to see which apps users are accessing.
+- Add `DeviceDetail` or `ClientAppUsed` for device/client insights.
+
+Let me know if you want one of those added!
+
 Here’s a **Kusto Query** (KQL) that summarizes `SignInLogs` by **hour**, **day**, and **month**, showing the count of sign-ins:
 
 ```kusto
