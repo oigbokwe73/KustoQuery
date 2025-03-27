@@ -2,6 +2,144 @@
 
 Great question! If you're in a constrained environment like **Microsoft Sentinel Workbook queries**, **Log Analytics alerts**, or **Power BI DirectQuery mode**, you might **not be allowed to use `let` statements**. In those cases, you can still achieve the same logic using **nested subqueries**, **common table expressions**, or just **inlined logic**.
 
+Absolutely! Below is a detailed **Kusto Query Language (KQL)** script for each of the **key SignInLogs indicators** you can use in **Azure Monitor Workbooks**, **Sentinel**, or **Power BI**.
+
+---
+
+## ✅ 1. **Total Sign-ins Over Time**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize TotalSignIns = count() by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+📊 **Chart**: Line/Area  
+🕐 **Use**: See daily or hourly usage trends.
+
+---
+
+## ✅ 2. **Sign-in Success vs Failure**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize
+    Success = countif(ResultType == 0),
+    Failure = countif(ResultType != 0)
+```
+📊 **Chart**: Pie/Bar  
+🛠️ **Use**: Measure overall sign-in health.
+
+---
+
+## ✅ 3. **Sign-ins by Application**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize SignInCount = count() by AppDisplayName
+| top 10 by SignInCount desc
+```
+📊 **Chart**: Horizontal Bar  
+📎 **Use**: Identify most/least accessed apps.
+
+---
+
+## ✅ 4. **Sign-ins by User**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize SignInCount = count() by UserPrincipalName
+| top 10 by SignInCount desc
+```
+📊 **Chart**: Bar/Table  
+👤 **Use**: See who’s most active.
+
+---
+
+## ✅ 5. **Sign-ins by Location (Country)**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize SignInCount = count() by Location
+| top 10 by SignInCount desc
+```
+📊 **Chart**: Map or Column Bar  
+🗺️ **Use**: Spot unusual geographies.
+
+---
+
+## ✅ 6. **Sign-ins by Device or OS**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| extend OS = tostring(DeviceDetail.operatingSystem)
+| summarize SignInCount = count() by OS
+| top 10 by SignInCount desc
+```
+📊 **Chart**: Pie or Bar  
+💻 **Use**: Track device adoption.
+
+---
+
+## ✅ 7. **MFA Status Summary**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize Count = count() by AuthenticationRequirement
+```
+📊 **Chart**: Pie/Stacked Bar  
+🔐 **Use**: Ensure MFA coverage.
+
+---
+
+## ✅ 8. **Sign-ins by Risk Level** (Entra ID P2 Required)
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| summarize Count = count() by RiskLevelDuringSignIn
+```
+📊 **Chart**: Bar  
+⚠️ **Use**: Spot risky sign-ins.
+
+---
+
+## ✅ 9. **Top Failed Users**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| where ResultType != 0
+| summarize Failures = count() by UserPrincipalName
+| top 10 by Failures desc
+```
+📊 **Chart**: Table  
+🚨 **Use**: Identify users with repeated login issues.
+
+---
+
+## ✅ 10. **Average Sign-in Duration (if available)**
+```kusto
+SignInLogs
+| where TimeGenerated > ago(7d)
+| where isnotempty(SignInDurationMs)
+| summarize AvgSignInTimeMs = avg(todouble(SignInDurationMs)) by bin(TimeGenerated, 1h)
+```
+📊 **Chart**: Line  
+⏱️ **Use**: Track sign-in performance trends.
+
+---
+
+## ⚙️ Bonus: Total Sign-ins Today
+```kusto
+SignInLogs
+| where TimeGenerated >= startofday(now())
+| summarize TotalToday = count()
+```
+📊 **Chart**: KPI Card  
+📆 **Use**: Daily metric at a glance.
+
+---
+
+Would you like me to combine these into a **Power BI-ready query set** or help you deploy them into an **Azure Workbook with visuals**?
+
 Here are a few **workarounds** to replace `let`:
 
 ---
