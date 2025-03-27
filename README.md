@@ -1,5 +1,133 @@
 # KustoQuery
 
+
+Perfect! Let’s walk through a **detailed KQL** solution for tracking **Azure Application Gateway uptime** using **AzureDiagnostics** and **AzureMetrics** tables in **Log Analytics**.
+
+Since Application Gateway logs are stored in the `AzureDiagnostics` table (for access logs, firewall logs, etc.), and availability can be tracked via **successful requests** or **metrics** like `UnhealthyHostCount`, you have multiple ways to approach it depending on the signals available.
+
+---
+
+## ✅ **Approach 1: Uptime Based on Successful Request Logs (`AzureDiagnostics`)**
+
+This approach assumes:
+- You define "uptime" as the presence of **successful HTTP requests** through the App Gateway.
+- You want to detect periods with **no traffic or only failed traffic**.
+
+```kusto
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS" and TimeGenerated > ago(7d)
+| where Category == "ApplicationGatewayAccessLog"
+| extend StatusCode = tostring(propertiesHttpStatus)
+| extend RequestSuccess = iff(toint(StatusCode) between (200 .. 399), 1, 0)
+| summarize
+    TotalRequests = count(),
+    SuccessfulRequests = countif(RequestSuccess == 1),
+    FailedRequests = countif(RequestSuccess == 0),
+    UptimePct = round(100.0 * SuccessfulRequests / TotalRequests, 2)
+by bin(TimeGenerated, 1h), Resource
+| order by TimeGenerated asc
+```
+
+### 📊 Output:
+| TimeGenerated     | Resource             | TotalRequests | SuccessfulRequests | FailedRequests | UptimePct |
+|-------------------|----------------------|----------------|---------------------|----------------|-----------|
+| 2025-03-26 14:00  | appgw-prod-westus     | 120            | 118                 | 2              | 98.33     |
+
+> This gives you hourly uptime % based on successful HTTP status codes.
+
+---
+
+## ✅ **Approach 2: Uptime Based on Backend Health (`AzureMetrics`)**
+
+This is a more infrastructure-level view — using `UnhealthyHostCount` from metrics.
+
+```kusto
+AzureMetrics
+| where Resource == "your-app-gateway-name"
+| where MetricName == "UnhealthyHostCount"
+| where TimeGenerated > ago(7d)
+| summarize
+    AvgUnhealthy = avg(Total),
+    MaxUnhealthy = max(Total)
+by bin(TimeGenerated, 5m), Resource
+| extend Healthy = iff(MaxUnhealthy == 0, 1, 0)
+| summarize
+    TotalIntervals = count(),
+    HealthyIntervals = countif(Healthy == 1),
+    DowntimeIntervals = countif(Healthy == 0),
+    UptimePct = round(100.0 * HealthyIntervals / TotalIntervals, 2)
+by Resource
+```
+
+### 📊 Output:
+| Resource            | TotalIntervals | HealthyIntervals | DowntimeIntervals | UptimePct |
+|---------------------|----------------|------------------|-------------------|-----------|
+| appgw-prod-westus   | 2016           | 2000             | 16                | 99.21     |
+
+> This is great for **SLA monitoring**: uptime % by backend health.
+
+---
+
+## ✅ **Approach 3: Detect Missing Logs (Potential Downtime Periods)**
+
+```kusto
+range TimeSlot from ago(7d) to now() step 5m
+| join kind=leftanti (
+    AzureDiagnostics
+    | where ResourceType == "APPLICATIONGATEWAYS"
+    | where Category == "ApplicationGatewayAccessLog"
+    | summarize by bin(TimeGenerated, 5m)
+) on $left.TimeSlot == $right.TimeGenerated
+```
+
+### 📊 Output:
+This query gives you **time slots where no App Gateway logs were received**, possibly indicating a downtime or traffic interruption.
+
+---
+
+## ✅ Bonus: Real-Time Uptime Status for Today
+
+```kusto
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS"
+| where Category == "ApplicationGatewayAccessLog"
+| where TimeGenerated >= startofday(now())
+| extend IsSuccess = iff(toint(propertiesHttpStatus) between (200 .. 399), 1, 0)
+| summarize
+    Total = count(),
+    Success = countif(IsSuccess == 1),
+    Failures = countif(IsSuccess == 0),
+    UptimePct = round(100.0 * Success / Total, 2)
+```
+
+---
+
+## 📈 Suggested Visuals for Azure Workbook or Power BI
+
+| Visual Type    | Metric                         | Source            |
+|----------------|--------------------------------|--------------------|
+| Line Chart     | Uptime % per hour              | AzureDiagnostics   |
+| Bar Chart      | Backend Unhealthy Host Count   | AzureMetrics       |
+| Table          | Failed Requests Summary        | AzureDiagnostics   |
+| KPI            | Uptime % today                 | Both               |
+
+---
+
+### Want to monitor for specific status codes like 502, 503?
+```kusto
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS"
+| where Category == "ApplicationGatewayAccessLog"
+| where propertiesHttpStatus in ("502", "503")
+| summarize count() by propertiesHttpStatus, bin(TimeGenerated, 1h)
+```
+
+---
+
+Let me know:
+- Your App Gateway's **name or region**
+- If you’re using **WAF**, we can also pull WAF log-based downtime.
+- Or if you'd like a **ready-to-import Workbook JSON**.
 Great! Tracking **App Uptime** using **Kusto Query Language (KQL)** depends on where your application logs its availability — typically through **Heartbeat logs**, **Availability Results**, **Custom Events**, or **Application Logs** in **Azure Monitor / Application Insights**.
 
 Here’s a **detailed KQL** to calculate and visualize **App Uptime**, including availability percentage, downtime duration, and response health.
