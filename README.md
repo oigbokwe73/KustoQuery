@@ -1,5 +1,104 @@
 # KustoQuery
 
+Great! Tracking **App Uptime** using **Kusto Query Language (KQL)** depends on where your application logs its availability — typically through **Heartbeat logs**, **Availability Results**, **Custom Events**, or **Application Logs** in **Azure Monitor / Application Insights**.
+
+Here’s a **detailed KQL** to calculate and visualize **App Uptime**, including availability percentage, downtime duration, and response health.
+
+---
+
+## ✅ Scenario 1: **Using `availabilityResults` Table (App Insights Ping Test)**
+
+```kusto
+availabilityResults
+| where timestamp > ago(7d)
+| extend Result = iff(success == true, "Success", "Failure")
+| summarize
+    TotalTests = count(),
+    SuccessfulTests = countif(success == true),
+    FailedTests = countif(success == false),
+    UptimePct = todecimal(round(100 * countif(success == true) / count(), 2))
+by bin(timestamp, 1h), name
+| order by timestamp asc
+```
+
+### 📊 Output:
+| timestamp     | name           | TotalTests | SuccessfulTests | FailedTests | UptimePct |
+|---------------|----------------|------------|------------------|--------------|-----------|
+| 2025-03-25 00:00 | MyApp-UptimeTest | 12         | 12               | 0            | 100       |
+
+📌 `name` refers to the availability test name (e.g., ping or URL test)
+
+---
+
+## ✅ Scenario 2: **Using `heartbeat` Table (VM/Container Uptime)**
+
+```kusto
+Heartbeat
+| where TimeGenerated > ago(7d)
+| summarize HeartbeatsPerHour = count() by bin(TimeGenerated, 1h), Computer
+| extend Uptime = iff(HeartbeatsPerHour >= 1, 1, 0)
+| summarize
+    TotalHours = count(),
+    UptimeHours = sum(Uptime),
+    DowntimeHours = TotalHours - UptimeHours,
+    UptimePct = round(100.0 * UptimeHours / TotalHours, 2)
+by Computer
+```
+
+### 📊 Output:
+| Computer       | TotalHours | UptimeHours | DowntimeHours | UptimePct |
+|----------------|------------|--------------|----------------|-----------|
+| vm-app01       | 168        | 167          | 1              | 99.40     |
+
+🧠 Assumes a heartbeat every hour. You can tune for other intervals like `5m`, `10m`, etc.
+
+---
+
+## ✅ Scenario 3: **Using Custom App Logs (e.g., App Logs a Health Ping)**
+
+If your app logs a success/fail message (e.g., `/healthcheck` endpoint), you can track uptime this way:
+
+```kusto
+AppTraces
+| where TimeGenerated > ago(7d)
+| where Message has "HealthCheck"
+| extend Status = iff(Message has "Healthy", "Success", "Failure")
+| summarize
+    TotalChecks = count(),
+    Successes = countif(Status == "Success"),
+    Failures = countif(Status == "Failure"),
+    UptimePct = round(100.0 * Successes / TotalChecks, 2)
+by bin(TimeGenerated, 1h)
+```
+
+---
+
+## ✅ Bonus: Overall Uptime as a KPI (for today)
+```kusto
+availabilityResults
+| where timestamp >= startofday(now())
+| summarize
+    Total = count(),
+    Up = countif(success == true),
+    Down = countif(success == false),
+    UptimePct = round(100.0 * Up / Total, 2)
+```
+
+---
+
+## 📈 Suggested Visuals
+
+| KPI / Chart            | Use                      | Data Source           |
+|------------------------|--------------------------|------------------------|
+| Uptime % (KPI Card)    | Quick glance             | `availabilityResults` |
+| Downtime duration      | Alerting                 | `availabilityResults` |
+| Uptime trend (Line)    | Historical tracking      | `availabilityResults` |
+| Uptime by Region/App   | Split by dimension       | `availabilityResults` or `Heartbeat` |
+| Failures list (Table)  | Drill-down into issues   | `availabilityResults` |
+
+---
+
+Would you like a **dashboard-ready Workbook**, **Power BI version**, or help mapping this to **custom app health events**?
 Great question! If you're in a constrained environment like **Microsoft Sentinel Workbook queries**, **Log Analytics alerts**, or **Power BI DirectQuery mode**, you might **not be allowed to use `let` statements**. In those cases, you can still achieve the same logic using **nested subqueries**, **common table expressions**, or just **inlined logic**.
 
 Absolutely! Below is a detailed **Kusto Query Language (KQL)** script for each of the **key SignInLogs indicators** you can use in **Azure Monitor Workbooks**, **Sentinel**, or **Power BI**.
