@@ -226,10 +226,7 @@ availabilityResults
 
 ---
 
-Would you like a **dashboard-ready Workbook**, **Power BI version**, or help mapping this to **custom app health events**?
-Great question! If you're in a constrained environment like **Microsoft Sentinel Workbook queries**, **Log Analytics alerts**, or **Power BI DirectQuery mode**, you might **not be allowed to use `let` statements**. In those cases, you can still achieve the same logic using **nested subqueries**, **common table expressions**, or just **inlined logic**.
-
-Absolutely! Below is a detailed **Kusto Query Language (KQL)** script for each of the **key SignInLogs indicators** you can use in **Azure Monitor Workbooks**, **Sentinel**, or **Power BI**.
+Below is a detailed **Kusto Query Language (KQL)** script for each of the **key SignInLogs indicators** you can use in **Azure Monitor Workbooks**, **Sentinel**, or **Power BI**.
 
 ---
 
