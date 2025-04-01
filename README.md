@@ -1,4 +1,54 @@
 # KustoQuery
+To query uptime and downtime from `InsightsMetrics`, you typically look at a metric that reflects the availability or status of a resource. For example, if the metric reports availability as a percentage (e.g., 100% for fully up, 0% for fully down), you can analyze how often the resource is fully available versus partially or fully unavailable.
+
+**Example Query:**
+```kql
+InsightsMetrics
+| where Name == "Availability"  // Adjust "Availability" to the actual metric name for uptime if different
+| extend UptimeStatus = case(
+    Val == 100, "Uptime",
+    Val > 0 and Val < 100, "Partial Downtime",
+    Val == 0, "Downtime",
+    "Unknown"
+)
+| summarize 
+    UptimeCount = countif(UptimeStatus == "Uptime"),
+    PartialDowntimeCount = countif(UptimeStatus == "Partial Downtime"),
+    DowntimeCount = countif(UptimeStatus == "Downtime"),
+    TotalEntries = count(),
+    UptimePercentage = 100 * countif(UptimeStatus == "Uptime") / count(),
+    DowntimePercentage = 100 * countif(UptimeStatus == "Downtime") / count()
+    by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**How This Query Works:**
+1. **Filter by Metric Name:**  
+   Replace `"Availability"` with the actual metric name that reflects uptime or availability in your `InsightsMetrics` dataset.
+
+2. **Categorize Uptime and Downtime:**  
+   The `case()` function categorizes data into three groups:  
+   - `Uptime` when the value is `100` (fully available).  
+   - `Partial Downtime` when the value is greater than `0` but less than `100` (partially available).  
+   - `Downtime` when the value is `0` (completely unavailable).
+
+3. **Summarize by Time Bins:**  
+   - Count how many instances fall into each category (`UptimeCount`, `PartialDowntimeCount`, `DowntimeCount`).
+   - Calculate uptime and downtime percentages.
+   - Use `bin(TimeGenerated, 1h)` to break the data into hourly intervals. Adjust the time bin if needed.
+
+4. **Order by Time:**  
+   Sorting results by `TimeGenerated` helps you see how uptime/downtime trends over time.
+
+**What You’ll Get:**
+- **Hourly intervals** showing the count of uptime, partial downtime, and full downtime events.
+- **Percentages** indicating the proportion of time the resource was up or down.
+- A clear trend of availability over the queried time period.
+
+This query can help you understand the stability of your resource and identify periods of reduced availability or outright downtime.
+
+
+
 
 
 Perfect! Let’s walk through a **detailed KQL** solution for tracking **Azure Application Gateway uptime** using **AzureDiagnostics** and **AzureMetrics** tables in **Log Analytics**.
