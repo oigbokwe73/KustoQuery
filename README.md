@@ -1,4 +1,43 @@
 # KustoQuery
+
+You can use the **Heartbeat** table to calculate the uptime percentage by determining how frequently heartbeat signals were sent during a given time window. Each entry in the **Heartbeat** table typically represents a "ping" that indicates the monitored resource was online and responsive at that moment. 
+
+Below is a Kusto query that calculates the uptime percentage within each hourly time bin:
+
+```kql
+Heartbeat
+| summarize HeartbeatCount = count(), 
+            TimeSlots = dcount(bin(TimeGenerated, 1m)) 
+            by Computer, bin(TimeGenerated, 1h)
+| extend UptimePercentage = (HeartbeatCount * 100.0) / TimeSlots
+| project TimeGenerated, Computer, UptimePercentage
+| order by TimeGenerated asc
+```
+
+**How the Query Works:**
+
+1. **Count Heartbeats (HeartbeatCount):**
+   - Each record in the **Heartbeat** table represents a status check. By counting the total number of heartbeat entries for a given computer in an hourly bin, we know how many times that computer reported itself as online.
+
+2. **Count Distinct Time Slots (TimeSlots):**
+   - If heartbeats are expected every minute, you can count how many unique minute slots occurred in that hour. This represents the number of expected heartbeats during a fully "up" hour.
+   - Adjust the `bin(TimeGenerated, 1m)` interval if heartbeats occur at a different frequency.
+
+3. **Calculate Uptime Percentage:**
+   - The percentage is `(HeartbeatCount / TimeSlots) * 100`.
+   - If all expected heartbeats are present, the percentage will be close to 100%. Fewer heartbeats indicate downtime, reducing the percentage.
+
+4. **Projection:**
+   - You can project fields like the timestamp, the computer’s name, and the calculated uptime percentage for clarity.
+
+5. **Sorting:**
+   - The query sorts the results by time, making it easier to see uptime trends over time.
+
+**Important Notes:**
+- Make sure the time interval for binning matches the expected frequency of heartbeats. If you expect a heartbeat every minute, a `1m` interval works well. If heartbeats occur at different intervals, adjust the binning accordingly.
+- If a resource is consistently emitting heartbeats without missing intervals, the uptime percentage will be 100%. Missing heartbeats (indicating downtime) will lower this value.
+
+This approach gives you a detailed breakdown of uptime percentages over time, using the **Heartbeat** table as the source of truth for availability.
 To query uptime and downtime from `InsightsMetrics`, you typically look at a metric that reflects the availability or status of a resource. For example, if the metric reports availability as a percentage (e.g., 100% for fully up, 0% for fully down), you can analyze how often the resource is fully available versus partially or fully unavailable.
 
 **Example Query:**
