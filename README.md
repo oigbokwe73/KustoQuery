@@ -1,3 +1,138 @@
+
+When analyzing **AGWAccessLogs** (Application Gateway Access Logs) for key performance indicators (KPIs), you typically focus on metrics that help you understand traffic patterns, response performance, error rates, and data throughput. Below are a series of KQL queries to derive useful KPIs:
+
+---
+
+### 1. **Total Request Count**
+This metric provides the total number of requests received by the Application Gateway, grouped by time.
+
+```kql
+AGWAccessLogs
+| summarize TotalRequests = count() by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**Use Case:**  
+Understand overall traffic volume and patterns over time.
+
+---
+
+### 2. **Successful and Failed Requests**
+Break down requests into successful (status codes < 400) and failed (status codes >= 400) to monitor the health of your applications.
+
+```kql
+AGWAccessLogs
+| extend Success = iff(httpStatus_d < 400, "Success", "Failed")
+| summarize TotalRequests = count(), SuccessfulRequests = countif(httpStatus_d < 400), FailedRequests = countif(httpStatus_d >= 400) by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**Use Case:**  
+Track changes in the success-to-failure ratio over time and quickly spot when something starts failing more frequently.
+
+---
+
+### 3. **Response Time Statistics**
+Calculate average, maximum, and percentile response times to understand performance trends and outliers.
+
+```kql
+AGWAccessLogs
+| summarize 
+    AvgResponseTimeMS = avg(timeTaken_d * 1000), 
+    MaxResponseTimeMS = max(timeTaken_d * 1000), 
+    P95ResponseTimeMS = percentile(timeTaken_d * 1000, 95) 
+    by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**Use Case:**  
+Monitor how responsive your application is and ensure SLAs are being met.
+
+---
+
+### 4. **Data Throughput (Bytes Sent/Received)**
+Track how much data is flowing through your Application Gateway.
+
+```kql
+AGWAccessLogs
+| summarize 
+    TotalBytesSent = sum(bytesSent_d), 
+    TotalBytesReceived = sum(bytesReceived_d) 
+    by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**Use Case:**  
+Identify periods of high data transfer, which can help with capacity planning and cost analysis.
+
+---
+
+### 5. **Top Backend Pools by Requests**
+Determine which backend pools handle the most traffic.
+
+```kql
+AGWAccessLogs
+| summarize RequestCount = count() by backendPoolName_s, bin(TimeGenerated, 1h)
+| order by RequestCount desc
+```
+
+**Use Case:**  
+Pinpoint backends that are under heavy load or may require scaling.
+
+---
+
+### 6. **Status Code Distribution**
+Break down requests by status code range to understand the overall health of responses.
+
+```kql
+AGWAccessLogs
+| extend ResponseCategory = case(
+    httpStatus_d >= 500, "5xx Server Errors",
+    httpStatus_d >= 400, "4xx Client Errors",
+    httpStatus_d >= 300, "3xx Redirections",
+    httpStatus_d >= 200, "2xx Success",
+    "Other"
+)
+| summarize Count = count() by ResponseCategory, bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**Use Case:**  
+Quickly identify trends in errors, redirects, or successes.
+
+---
+
+### 7. **Requests by URL Path**
+Understand which endpoints receive the most traffic.
+
+```kql
+AGWAccessLogs
+| summarize RequestCount = count() by requestUri_s, bin(TimeGenerated, 1h)
+| order by RequestCount desc
+```
+
+**Use Case:**  
+Identify high-traffic endpoints to optimize caching, scaling, or prioritization efforts.
+
+---
+
+### 8. **Client IP Distribution**
+Identify the most frequent client IPs or regions.
+
+```kql
+AGWAccessLogs
+| summarize RequestCount = count() by clientIp_s, bin(TimeGenerated, 1h)
+| order by RequestCount desc
+```
+
+**Use Case:**  
+Understand where your traffic is coming from and ensure appropriate geographical scaling and security policies.
+
+---
+
+**Combining Queries for Dashboards:**  
+You can run these queries individually to investigate specific KPIs, or integrate them into a dashboard (using Azure Monitor Workbooks or a similar tool) to monitor them side-by-side. This allows you to maintain a real-time view of your Application Gateway’s health and performance.
+
 There are a variety of metrics available within the Application Gateway logs that can help you gain deeper insights into performance, reliability, and traffic patterns. Below are some additional metrics and corresponding KQL examples:
 
 1. **Response Status Distribution**  
