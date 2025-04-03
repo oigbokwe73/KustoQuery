@@ -1,3 +1,109 @@
+There are a variety of metrics available within the Application Gateway logs that can help you gain deeper insights into performance, reliability, and traffic patterns. Below are some additional metrics and corresponding KQL examples:
+
+1. **Response Status Distribution**  
+   This metric shows how requests are distributed across different status code ranges (e.g., successful, client errors, server errors).  
+   ```kql
+   AzureDiagnostics
+   | where ResourceType == "APPLICATIONGATEWAYS"
+   | summarize SuccessfulRequests = countif(ResponseStatus_d < 400),
+               ClientErrorRequests = countif(ResponseStatus_d >= 400 and ResponseStatus_d < 500),
+               ServerErrorRequests = countif(ResponseStatus_d >= 500)
+               by bin(TimeGenerated, 1h)
+   ```
+
+2. **Bytes Sent and Received**  
+   This metric shows the amount of data transmitted and received through the gateway over time, which can help identify bandwidth usage or large traffic spikes.  
+   ```kql
+   AzureDiagnostics
+   | where ResourceType == "APPLICATIONGATEWAYS"
+   | summarize BytesSent = sum(ToLong(BytesSent_d)), 
+               BytesReceived = sum(ToLong(BytesReceived_d))
+               by bin(TimeGenerated, 1h)
+   ```
+
+3. **Request Counts Per Host**  
+   If your Application Gateway handles multiple backends, you can analyze how many requests are routed to each hostname or backend pool.  
+   ```kql
+   AzureDiagnostics
+   | where ResourceType == "APPLICATIONGATEWAYS"
+   | summarize RequestsPerHost = count() by Host_s, bin(TimeGenerated, 1h)
+   ```
+
+4. **Backend Response Times**  
+   You can examine the average time taken by the backend to respond to requests, providing insight into which backends might be causing latency.  
+   ```kql
+   AzureDiagnostics
+   | where ResourceType == "APPLICATIONGATEWAYS" and BackendResponseTime_d != ""
+   | summarize AvgBackendResponseTimeMS = avg(ToLong(BackendResponseTime_d) * 1000)
+               by BackendPoolName_s, bin(TimeGenerated, 1h)
+   ```
+
+5. **Connection Counts**  
+   Monitoring the number of connections established can help identify trends in user traffic and potential scaling issues.  
+   ```kql
+   AzureDiagnostics
+   | where ResourceType == "APPLICATIONGATEWAYS"
+   | summarize TotalConnections = count() by bin(TimeGenerated, 1h)
+   ```
+
+6. **Failed Requests Over Time**  
+   Highlighting failed requests helps identify problem periods or trends in error rates.  
+   ```kql
+   AzureDiagnostics
+   | where ResourceType == "APPLICATIONGATEWAYS" and ResponseStatus_d >= 400
+   | summarize FailedRequests = count() by bin(TimeGenerated, 1h)
+   ```
+
+**Customizing These Metrics:**  
+- **Adjust the Time Bin Size:** You can change `bin(TimeGenerated, 1h)` to a smaller or larger interval depending on how granular you want your insights.  
+- **Add Additional Filters:** For example, if you only care about certain hosts, backend pools, or specific response statuses, you can add additional `where` conditions.  
+- **Use Percentiles and Averages:** For metrics like response times or data throughput, consider adding `percentile()` or `avg()` to understand the distribution more clearly.
+
+By combining these queries and metrics, you can gain a comprehensive view of how your Application Gateway is performing, identify issues quickly, and plan capacity or optimization efforts effectively.
+If you’d like to focus specifically on request/response performance, you can use metrics related to request processing time or response latency. Application Gateway logs often include a field like `TimeTaken` (usually in milliseconds) that indicates how long it took to handle a request. You can aggregate this data over time to observe average, minimum, maximum, and percentile values for response performance.
+
+Here’s a KQL query that analyzes request and response performance metrics over time:
+
+```kql
+AzureDiagnostics
+| where ResourceType == "APPLICATIONGATEWAYS"
+| extend RequestTimeMS = toint(TimeTaken)
+| summarize
+    AverageTimeMS = avg(RequestTimeMS),
+    P95TimeMS = percentile(RequestTimeMS, 95),
+    MaxTimeMS = max(RequestTimeMS),
+    MinTimeMS = min(RequestTimeMS)
+    by bin(TimeGenerated, 1h)
+| order by TimeGenerated asc
+```
+
+**Key Steps:**
+1. **Filter for Application Gateway Logs:**  
+   The `where ResourceType == "APPLICATIONGATEWAYS"` clause ensures you’re only working with logs related to your Application Gateway.
+
+2. **Extract and Convert Request Time:**  
+   - `TimeTaken` is typically a string or numeric field representing the request handling time in milliseconds.  
+   - `toint()` converts it to an integer so you can perform numerical calculations.  
+   - If your environment uses a different field for latency, replace `TimeTaken` with that field’s name.
+
+3. **Aggregate Performance Metrics:**  
+   - `avg(RequestTimeMS)` calculates the average request time.  
+   - `percentile(RequestTimeMS, 95)` calculates the 95th percentile, a common measure to highlight high latency scenarios without being skewed by extreme outliers.  
+   - `max()` and `min()` give you the range of observed response times.
+
+4. **Summarize Over Time Intervals:**  
+   - `bin(TimeGenerated, 1h)` groups the metrics into hourly intervals. Adjust this to a finer granularity if needed (e.g., `10m` or `5m`).
+
+5. **Sort Results by Time:**  
+   - Sorting by `TimeGenerated` helps you visualize performance trends over time, making it easier to spot increases in latency or performance degradation.
+
+**What This Query Tells You:**  
+- The average response time over each time interval.  
+- The maximum and minimum request times, helping identify spikes or bottlenecks.  
+- The 95th percentile response time, highlighting the experience of the slowest 5% of requests.
+
+You can use these insights to understand how your Application Gateway handles traffic, diagnose potential performance issues, and track improvements over time.
+
 # KustoQuery
 
 You can use the **Heartbeat** table to calculate the uptime percentage by determining how frequently heartbeat signals were sent during a given time window. Each entry in the **Heartbeat** table typically represents a "ping" that indicates the monitored resource was online and responsive at that moment. 
