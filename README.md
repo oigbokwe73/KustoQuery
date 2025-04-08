@@ -1,4 +1,73 @@
+To get **detailed memory utilization** for **Azure Virtual Machines** using **Kusto Query Language (KQL)**, you'll typically rely on the `InsightsMetrics` table, which collects performance data including memory usage. Here's a **comprehensive KQL query** that calculates memory utilization, assuming your VMs report `AvailableMB` and `TotalVisibleMemorySizeMB`.
 
+---
+
+### **Detailed KQL for VM Memory Utilization**
+
+```kql
+InsightsMetrics
+| where Namespace == "Memory" and Name in ("AvailableMB", "TotalVisibleMemorySizeMB")
+| extend 
+    MetricName = Name,
+    ValueMB = Val,
+    Time = bin(TimeGenerated, 5m)
+| summarize AvgVal = avg(ValueMB) by Computer, MetricName, Time
+| evaluate pivot(MetricName, avg(AvgVal))
+| extend 
+    MemoryUsedMB = TotalVisibleMemorySizeMB - AvailableMB,
+    MemoryUtilizationPercent = round(100.0 * MemoryUsedMB / TotalVisibleMemorySizeMB, 2)
+| project Time, Computer, TotalMemoryMB = TotalVisibleMemorySizeMB, UsedMemoryMB = MemoryUsedMB, FreeMemoryMB = AvailableMB, MemoryUtilizationPercent
+| order by Time asc
+```
+
+---
+
+### **What This Query Does:**
+
+1. **Filters for Memory Metrics**:
+   - `AvailableMB`: Free memory.
+   - `TotalVisibleMemorySizeMB`: Total physical memory available to the OS.
+
+2. **Groups in 5-Minute Bins**:
+   - Uses `bin(TimeGenerated, 5m)` to group values over time for trending.
+
+3. **Calculates Averages Per Metric**:
+   - Aggregates metric values to reduce noise and get a clearer picture of usage.
+
+4. **Pivots the Table**:
+   - Converts rows into columns using `evaluate pivot`, so we can compute usage with `Total - Available`.
+
+5. **Calculates Usage and Percentage**:
+   - Computes `UsedMemoryMB` and formats `MemoryUtilizationPercent` to 2 decimal places.
+
+6. **Projects Clean Output**:
+   - Displays time, computer name, total, used, free memory in MB, and percent utilization.
+
+---
+
+### **Example Output:**
+
+| Time                | Computer         | TotalMemoryMB | UsedMemoryMB | FreeMemoryMB | MemoryUtilizationPercent |
+|---------------------|------------------|----------------|----------------|----------------|----------------------------|
+| 2025-04-08 10:00:00 | VM-App-01         | 32768          | 10240          | 22528          | 31.25                      |
+
+---
+
+### **Optional Enhancements:**
+
+- **Filter for specific VM(s)**:
+  ```kql
+  | where Computer == "my-vm-name"
+  ```
+
+- **Filter by high memory usage**:
+  ```kql
+  | where MemoryUtilizationPercent > 80
+  ```
+
+- **Group by resource group or region** if `ResourceGroup` or `Region` fields are present.
+
+Let me know if you'd like this visualized as a chart or integrated with alerts!
 When analyzing **AGWAccessLogs** (Application Gateway Access Logs) for key performance indicators (KPIs), you typically focus on metrics that help you understand traffic patterns, response performance, error rates, and data throughput. Below are a series of KQL queries to derive useful KPIs:
 
 ---
