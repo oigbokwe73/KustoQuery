@@ -1,3 +1,61 @@
+Great! If you want to **use the value of `TotalVisibleMemorySizeMB` directly from the VM's `Tags`** (instead of the metric), you can extract it from the `Tags` field in the `InsightsMetrics` table. This is useful when the total memory size is tagged as metadata (for example: `"memorySizeMB": "32768"`).
+
+---
+
+### ✅ **KQL: Memory Utilization Using `TotalVisibleMemorySizeMB` from Tags**
+
+```kql
+InsightsMetrics
+| where Namespace == "Memory" and Name == "AvailableMB"
+| where isnotempty(Tags["memorySizeMB"])  // Ensure the tag exists
+| extend 
+    AvailableMB = Val,
+    Time = bin(TimeGenerated, 5m),
+    TotalMemoryMB = toreal(Tags["memorySizeMB"])  // Convert tag value from string to number
+| extend 
+    UsedMemoryMB = TotalMemoryMB - AvailableMB,
+    MemoryUtilizationPercent = round(100.0 * UsedMemoryMB / TotalMemoryMB, 2)
+| project Time, Computer, TotalMemoryMB, UsedMemoryMB, AvailableMB, MemoryUtilizationPercent
+| order by Time asc
+```
+
+---
+
+### 🔍 Key Points:
+
+- **Tags["memorySizeMB"]**: Assumes you have a tag on the VM like:
+  ```json
+  "memorySizeMB": "32768"
+  ```
+- **`toreal()`**: Converts the tag value (string) into a numeric type for math operations.
+- Only one metric (`AvailableMB`) is needed since we're pulling the total memory from the tag.
+
+---
+
+### 🧠 Optional Enhancements:
+
+- **Filter VMs with specific memory sizes**:
+  ```kql
+  | where Tags["memorySizeMB"] == "65536"
+  ```
+
+- **Group by memory size to compare usage patterns**:
+  ```kql
+  | summarize avg(MemoryUtilizationPercent) by TotalMemoryMB, bin(Time, 1h)
+  ```
+
+---
+
+### 📈 Sample Output:
+
+| Time                | Computer     | TotalMemoryMB | UsedMemoryMB | AvailableMB | MemoryUtilizationPercent |
+|---------------------|--------------|----------------|----------------|----------------|----------------------------|
+| 2025-04-09 09:00:00 | vm-web-01     | 32768          | 11264          | 21504          | 34.38                      |
+
+---
+
+Let me know if you'd like to render this in a chart or correlate it with CPU usage!
+
 To get **detailed memory utilization** for **Azure Virtual Machines** using **Kusto Query Language (KQL)**, you'll typically rely on the `InsightsMetrics` table, which collects performance data including memory usage. Here's a **comprehensive KQL query** that calculates memory utilization, assuming your VMs report `AvailableMB` and `TotalVisibleMemorySizeMB`.
 
 ---
